@@ -148,6 +148,10 @@ MODULE glm_api_aed
    AED_REAL,POINTER :: air_temp
    AED_REAL,POINTER :: humidity
    AED_REAL,POINTER :: I_0
+   !# AED's surface irradiance = the shortwave that enters the
+   !# water in GLM (after albedo, the sub-daily cycle and ice/snow attenuation), not the raw
+   !# daily-mean forcing value. Set before every AED step in api_do_glm.
+   AED_REAL,TARGET :: I0_water = 0.
    AED_REAL,POINTER :: longwave
    AED_REAL,POINTER :: wind
    AED_REAL,POINTER :: air_pres
@@ -265,7 +269,7 @@ SUBROUTINE api_set_glm_env()
    wind     => MetData%WindSpeed
    rain     => MetData%Rain
    evap             => SurfData%Evap
-   I_0              => MetData%ShortWave
+   I_0              => I0_water        ! was MetData%ShortWave
    longwave         => MetData%LongWave
    u_star_api       => SurfData%u_star
    Q_net_api        => SurfData%Q_net
@@ -728,6 +732,10 @@ SUBROUTINE api_do_glm(wlev)                             BIND(C, name=_WQ_DO_GLM)
    ENDIF
 
    doSurface = .NOT. ice
+   !# rad(wlev) = Lake[surfLayer].Light, which fix_radiation() (glm_model.c,
+   !# called before wq_do_glm) sets to the full shortwave entering the water (net of albedo and
+   !# ice/snow). AED applies its own par_fraction to I_0.
+   I0_water = rad(wlev)
    CALL aed_run_model(1, wlev, doSurface)
 
    !# Save layer count, heights and cumulative areas for interpolation on next timestep
